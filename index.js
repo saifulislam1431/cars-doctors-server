@@ -31,7 +31,7 @@ async function run() {
 
     const servicesCollection = client.db("carDoctors").collection("servicesData");
     const productsCollection = client.db("carDoctors").collection("productData");
-    const bookingCollection = client.db("carDoctor").collection("bookingData")
+    const bookingCollection = client.db("carDoctors").collection("bookingData")
 
     app.get("/services", async(req,res)=>{
         const cursor = servicesCollection.find();
@@ -52,10 +52,19 @@ async function run() {
       res.send(result)
     })
 
-    app.get("bookings",async(req,res)=>{
-        const cursor = bookingCollection.find();
-        const result = await cursor.toArray();
+    app.get("/bookings",async(req,res)=>{
+        let query = {};
+        if(req.query?.email){
+          query = {email : req.query.email}
+        };
+        const result = await bookingCollection.find(query).toArray();
         res.send(result)
+    })
+    app.get("/bookings/:id", async(req,res)=>{
+      const id = req.params.id;
+      const query = {_id : new ObjectId(id)};
+      const result = await bookingCollection.findOne(query);
+      res.send(result)
     })
 
 
@@ -66,6 +75,19 @@ async function run() {
         const result = await bookingCollection.insertOne(order);
         res.send(result)
     })
+
+    // Delete data
+    app.delete("/bookings/:id",async(req,res)=>{
+      const id = req.params.id;
+      const query = {_id : new ObjectId(id)}
+      const result = await bookingCollection.deleteOne(query);
+      res.send(result)
+    })
+
+
+
+
+
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
