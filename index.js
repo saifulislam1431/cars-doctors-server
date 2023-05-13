@@ -1,6 +1,7 @@
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const port = process.env.PORT || 5000;
 const app = express();
@@ -24,6 +25,27 @@ const client = new MongoClient(uri, {
   }
 });
 
+const verifyJwt = (req , res, next)=>{
+  // console.log("Verify loading...");
+  const authorization = req.headers.authorization;
+  // console.log(authorization);
+  if(!authorization){
+    res.status(403).send({error : true , message : "Unauthorized access"})
+  }
+
+
+  const token = authorization.split(' ')[1]
+
+
+  jwt.verify(token , process.env.JWT_PRIVATE_KEY ,(error , decoded)=>{
+    if(error){
+      res.status(403).send({error:true , message:"Unauthorized access"})
+    }
+    req.decoded = decoded;
+    next();
+  })
+}
+
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
@@ -33,6 +55,16 @@ async function run() {
     const productsCollection = client.db("carDoctors").collection("productData");
     const bookingCollection = client.db("carDoctors").collection("bookingData")
 
+
+    // JWT API
+    app.post("/jwt" , (req, res)=>{
+      const user = req.body;
+      console.log(user);
+      const token = jwt.sign(user , process.env.JWT_PRIVATE_KEY , {expiresIn : '1h'})
+      res.send({token});
+    })
+
+    // Services API
     app.get("/services", async(req,res)=>{
         const cursor = servicesCollection.find();
         const result = await cursor.toArray();
@@ -46,13 +78,23 @@ async function run() {
         res.send(result)
     })
 
+    // Products API
     app.get("/products", async(req,res)=>{
       const cursor = productsCollection.find();
       const result = await cursor.toArray();
       res.send(result)
     })
 
-    app.get("/bookings",async(req,res)=>{
+    // Bookings API
+    app.get("/bookings",verifyJwt,async(req,res)=>{
+      // console.log(req.headers.authorization)
+      const decoded = req.decoded;
+      // console.log("decoded text",decoded.email);
+
+      if(decoded.email !== req.query.email){
+        res.status(403).send("Forbidden")
+      }
+
         let query = {};
         if(req.query?.email){
           query = {email : req.query.email}
@@ -96,7 +138,7 @@ async function run() {
         }
       };
       const result = await bookingCollection.updateOne(filter,updateDoc)
-      res.send(result);
+      res.send(result)
     })
 
 
